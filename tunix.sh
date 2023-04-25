@@ -1,9 +1,10 @@
 #!/bin/bash
 
 user=""
+playlists=""
 
 function play_songs() {
-	paths="$(sed -r 's/^.* \(([0-9]+)\)/songs\/\1.mp3/g' <<< $1)"
+	paths="$(sed -r 's/^([0-9]+)$/songs\/\1.mp3/g' <<< $1)"
 	read -p "Would you like to play these song(s)? ([y]es/[n]o/[s]huffle) " ans
 	while [ -n "$ans" ]; do
 		case "$ans" in
@@ -21,9 +22,9 @@ function play_songs() {
 	done
 }
 
-function play() {
+function search_songs() {
 	clear
-	printf "*** Search/Play Songs ***\n"
+	printf "*** Search Songs ***\n"
 	printf "To search songs by title and artist, use \"[title];[artist]\".\n"
 	printf "To search songs by title or artist alone, replace the other search term with *.\n"
 	printf "To search songs by ID, use \"[ID]\".\n"
@@ -42,7 +43,8 @@ function play() {
 		else
 			printf "$result"
 			printf "\n\n"
-			play_songs "$result"
+			ids="$(sed -r 's/^.* \(([0-9]+)\)/\1/g' <<< $result)"
+			play_songs "$ids"
 		fi
 		echo
 		read -p "What song(s) would you like to find? " title artist
@@ -50,23 +52,53 @@ function play() {
 	IFS=" "
 }
 
+function download_songs() {
+	clear
+	printf "*** Download Songs ***\n"
+	printf "Please enter the title and artist of the song you want to download. Both the title and artist may only contain alphanumeric characters, spaces, commas, and periods.\n"
+	read -p "Title: " title
+	read -p "Artist: " artist
+	if [[ ! "$title" =~ (^[A-Za-z0-9,. ]+$) ]]; then
+		printf "\nInvalid title. Press [Enter] to continue."
+		read
+	elif [[ ! "$artist" =~ (^[A-Za-z0-9,. ]+$) ]]; then
+		printf "\nInvalid artist. Press [Enter] to continue."
+		read
+	else
+		read -p "Please enter the URL of the song file: " url
+		printf "\nDownloading..."
+		let id_new="1 + $(sed -r 's/^.*\(([0-9]+)\)$/\1/g' catalog.txt | sort -n | tail -1)"
+		cd songs
+		wget -O "$id_new.mp3" "$url"
+		cd ..
+		printf "$title by $artist ($id_new)\n" >> catalog.txt
+		printf "$title by $artist has been successfully downloaded and saved under the ID $id_new. Press [Enter] to continue."
+		read
+	fi
+}
+
 function register() {
 	clear
 	printf "*** Register an Account ***\n"
 	printf "Please enter a unique username and a password containing at least 8 characters, including an uppercase letter, a lowercase letter, and a number. Both the username and password may only contain alphanumeric characters.\n"
 	read -p "Enter username: " username
-	while [[ ! "$username" =~ ^[A-Za-z0-9]+$ ]] || [ -n "$(cut -d, -f2 < users.txt | grep -iE "$username")" ]; do
-		read -p "Username is invalid or already taken. Please try again: " username
-	done
-	read -sp "Enter password: " password
-	while [[ ! "$password" =~ ^[A-Za-z0-9]+$ ]] || [ -z "$(echo "$password" | grep -E ".{8,}" | grep -E "[A-Z]+" | grep -E "[a-z]+" | grep -E "[0-9]+")" ]; do
-                echo
-		read -sp "Password is invalid. Please try again: " password
-        done
-	#let id_new="1 + $(cut -d, -f1 < users.txt | sort -n | tail -1)"
-	printf "$username,$password\n" >> users.txt
-	printf "\nSuccessfully created user $username."
-	user="$username"	
+	if [[ ! "$username" =~ ^[A-Za-z0-9]+$ ]] || [ -n "$(cut -d, -f2 < users.txt | grep -iE "$username")" ]; then
+		printf "\nUsername is invalid or already taken. Press [Enter] to continue.\n"
+		read
+		return 1
+	else
+		read -sp "Enter password: " password
+		if [[ ! "$password" =~ ^[A-Za-z0-9]+$ ]] || [ -z "$(echo "$password" | grep -E ".{8,}" | grep -E "[A-Z]+" | grep -E "[a-z]+" | grep -E "[0-9]+")" ]; then
+			printf "\nPassword is invalid. Press [Enter] to continue.\n"
+			read
+			return 1
+        	else
+			printf "$username,$password\n" >> users.txt
+			printf "\nSuccessfully created user $username."
+			user="$username"
+			return 0
+		fi
+	fi	
 }
 
 function login() {
@@ -87,34 +119,162 @@ function login() {
 }
 
 function search_playlists() {
+	clear
+	printf "*** Search Playlists ***\n"
+	printf "To search playlists by name and creator, use \"[name];[creator]\".\n"
+	printf "To search playlists by name or creator alone, replace the other search term with *.\n"
+	printf "To search songs by ID, use \"[ID]\".\n"
+	printf "To play a playlist, identify its ID and enter \"play [ID]\".\n"
+	printf "Otherwise, press [Enter] to return to the main menu.\n"
+	printf "\nNote: Playlists created by other users will only appear in search results if they are public.\n"
+	IFS=";"
 	echo
+	read -p "What playlist(s) would you like to find? " name creator
+	while [ -n "$name" ]; do
+		if [[ "$name" =~ (play [0-9]+) ]]; then
+			id="$(sed -r 's/^play ([0-9]+)/\1/' <<< "$name")"
+			songs="$(grep -E "^$id,.*$" <<< "$playlists" | sed -r 's/^.*,\(([0-9]*(,?[0-9]+)*),\)$/\1/' | sed -r 's/,/\|/g')"
+			if [ -z "$songs" ]; then
+				printf "\nNo results found for $id, or playlist is empty.."
+			else
+				printf "\nPlaylist $id found. Songs:\n"
+				songs2="$(sed -r 's/\|/\n/g' <<< "$songs")"
+				grep -E "^.* \($songs\)$" catalog.txt
+				echo
+				play_songs "$songs2"
+			fi
+		else
+			if [ -n "$creator" ]; then
+				result="$(grep -E "^[0-9]+*,$name,$creator,.*$" <<< "$playlists")"
+			else
+				result="$(grep -E "^$name,.*$" <<< "$playlists")"
+			fi
+			if [ -z "$result" ]; then
+				printf "No results found for $name."
+			else
+				sed -r 's/^([0-9]+),([^,]*),([^,]*),([^,]*),.*$/\[ID: \1\] "\2" by \3 \(\4\)/g' <<< "$result"
+			fi
+		fi
+		printf "\n"
+		read -p "What playlist(s) would you like to find? " name creator
+	done
+	IFS=" "
 }
 
 function edit_playlists() {
+	clear
+	printf "*** Edit Playlists ***\n"
+	printf "Your playlists:\n"
+	my_playlists="$(grep -E "^[0-9]+*,[^,]*,$user,.*$" <<< "$playlists")"
+	sed -r 's/^([0-9]+),([^,]*),([^,]*),([^,]*),.*$/\[ID: \1\] "\2" by \3 \(\4\)/g' <<< "$my_playlists"
 	echo
+	printf "To view a playlist, use \"view [playlist ID]\".\n"
+	printf "To add a song to a playlist, use \"add [song ID] [playlist ID]\".\n"
+	printf "To remove a song from a playlist, use \"rm [song ID] [playlist ID]\".\n"
+	printf "To create a new playlist, use \"create\".\n"
+	printf "To delete a playlist, use \"del [playlist ID]\".\n"
+	printf "Otherwise, press [Enter] to return to the main menu.\n"
+	echo
+	read option
+	while [ -n "$option" ]; do
+		if [[ "$option" =~ (^view [0-9]+$) ]]; then
+			id_pl="$(sed -r 's/^view ([0-9]+)$/\1/' <<< "$option")"
+			if [ -z "$(grep -E "^$id_pl,.*$" <<< "$playlists")" ]; then
+				printf "Error: Playlist $id_pl does not exist or is not owned by you.\n"
+			else
+				printf "Playlist $id_pl contains the following songs:\n"
+				songs="$(grep -E "^$id_pl,.*$" <<< "$playlists" | sed -r 's/^.*,\(([0-9]*(,?[0-9]+)*),\)$/\1/' | sed -r 's/,/\|/g')"
+				songs2="$(sed -r 's/\|/\n/g' <<< "$songs")"
+				grep -E "^.* \($songs\)$" catalog.txt
+			fi
+		elif [[ "$option" =~ (^add [0-9]+ [0-9]+$) ]]; then
+			id_song="$(sed -r 's/^add ([0-9]+) [0-9]+$/\1/' <<< "$option")"
+			id_pl="$(sed -r 's/^add [0-9]+ ([0-9]+)$/\1/' <<< "$option")"
+			if [ -z "$(grep -E "^$id_pl,.*$" <<< "$playlists")" ]; then
+				printf "Error: Playlist $id_pl does not exist or is not owned by you.\n"
+			elif [ -z "$(grep -E "^$id_song,.*$" catalog.txt)" ]; then
+				printf "Error: Song $id_song does not exist.\n"
+			elif [ ! -z "$(grep -E "^$id_pl,.*,[^0-9]*$id_song,(.*)$" <<< "$playlists")" ]; then
+				printf "Error: Song $id_song already exists in playlist $id_pl.\n"
+			else
+				sed -r "s/^$id_pl,(.*),\((.*)\)$/$id_pl,\1,\(\2$id_song,\)/" -i playlists.txt
+				printf "Song $id_song successfully added to playlist $id_pl.\n"
+			fi
+		elif [[ "$option" =~ (^rm [0-9]+ [0-9]+$) ]]; then
+			id_song="$(sed -r 's/^rm ([0-9]+) [0-9]+$/\1/' <<< "$option")"
+			id_pl="$(sed -r 's/^rm [0-9]+ ([0-9]+)$/\1/' <<< "$option")"
+			if [ -z "$(grep -E "^$id_pl,.*$" <<< "$playlists")" ]; then
+				printf "Error: Playlist $id_pl does not exist or is not owned by you.\n"
+			elif [ -z "$(grep -E "^$id_song,.*$" catalog.txt)" ]; then
+				printf "Error: Song $id_song does not exist.\n"
+			elif [ ! -z "$(grep -E "^$id_pl,.*,[^0-9]*$id_song,(.*)$" <<< "$playlists")" ]; then
+				sed -r "s/^$id_pl,(.*),\((.*,?)$id_song,(.*)\)$/$id_pl,\1,\(\2\3\)/" -i playlists.txt
+				printf "Song $id_song successfully removed from playlist $id_pl.\n"
+			else
+				printf "Error: Song $id_song does not exist in playlist $id_pl.\n"
+			fi
+		elif [[ "$option" == "create" ]]; then
+			read -p "Please enter a name for the playlist (alphanumeric characters only): " pl_name
+			if [[ ! "$pl_name" =~ ^[A-Za-z0-9]+$ ]]; then
+				printf "\nName is invalid."
+				break
+			else
+				echo
+				read -p "Please indicate whether the playlist will be [public/private]:" pl_status
+				if [ "$pl_status" != "public" ] && [ "$pl_status" != "private" ]; then
+                                	printf "\nResponse is invalid."
+				else
+					let id_new="1 + $(cut -d, -f1 < playlists.txt | sort -n | tail -1)"
+					printf "$id_new,$pl_name,$user,$pl_status,()\n" >> playlists.txt
+					printf "Playlist $pl_name by $user has been successfully created.\n"
+				fi
+			fi
+		elif [[ "$option" =~ (^del [0-9]+$) ]]; then
+			id_pl="$(sed -r 's/^del ([0-9]+)$/\1/' <<< "$option")"
+			if [ -z "$(grep -E "^$id_pl,.*$" <<< "$playlists")" ]; then
+				printf "Error: Playlist $id_pl does not exist or is not owned by you.\n"
+			else
+				read -p "Are you sure you want to delete playlist $id_pl [y/n]?" ans
+				if [ "$ans" == "y" ]; then
+					sed -r "s/^$id_pl,.*$//" -i playlists.txt
+					printf "Playlist $id_pl by $user has been successfully deleted.\n"
+				else
+					printf "No action taken.\n"
+				fi
+			fi
+		else
+			printf "Invalid response."
+		fi
+		echo
+		read -p "Please enter another command, or press [Enter] to return to the main menu: " option
+		playlists="$(grep -E "^.*,.*,$user,.*$|^.*,.*,.*,public,.*$" playlists.txt | sed -r 's/ /\n/g')"
+		my_playlists="$(grep -E "^[0-9]+*,[^,]*,$user,.*$" <<< "$playlists")"
+	done
 }
 
 function message_login() {
 	clear
-	printf "--------------------------------------------------\n"
+	printf "\n--------------------------------------------------\n"
         printf "Welcome to tunix, a Unix-based music player!\n"
         printf "You are currently logged in as: $user\n"
         printf "What would you like to do?"
         printf "\n--------------------------------------------------\n"
-        printf "(1) Search/Play\n"
-        printf "(2) Search playlists\n"
-        printf "(3) Edit playlists\n"
+        printf "(1)     Search songs\n"
+        printf "(2)     Search playlists\n"
+        printf "(3)     Edit playlists\n"
+	printf "(4)     Download songs\n"
         printf "(Enter) Log out"
         printf "\n--------------------------------------------------\n"
 }
 
 function main_login() {
+	playlists="$(grep -E "^.*,.*,$user,.*$|^.*,.*,.*,public,.*$" playlists.txt | sed -r 's/ /\n/g')"
 	message_login
 	read option
-        while [ ! -z "$option" ]; do
+        while [ -n "$option" ]; do
                 case "$option" in
-                        1)
-                                play
+			1)
+                                search_songs
 				message_login
                                 ;;
                         2)
@@ -125,6 +285,10 @@ function main_login() {
                                 edit_playlists
 				message_login
                                 ;;
+			4)
+				download_songs
+				message_login
+				;;
                         *)
                                 printf "Invalid option. Please try again.\n"
                 esac
@@ -141,9 +305,10 @@ function message_nologin() {
 	printf "You are currently not logged in.\n"
 	printf "What would you like to do?"
 	printf "\n--------------------------------------------------\n"
-	printf "(1) Search/Play\n"
-	printf "(2) Register\n"
-	printf "(3) Log in \n"
+	printf "(1)     Search songs\n"
+	printf "(2)     Register\n"
+	printf "(3)     Log in \n"
+	printf "(4)     Download songs \n"
 	printf "(Enter) Quit"
 	printf "\n--------------------------------------------------\n"
 }
@@ -152,15 +317,17 @@ function main_nologin() {
 	message_nologin
 	#printf "\n##################################################\n#                                                #\n#    Welcome to tunix, a Unix-based music        #\n#    player! You are currently not logged in.    #\n#    What would you like to do?                  #\n#                                                #\n#    ----------------------------------------    #\n#                                                #\n#    (1) Search/Play                             #\n#    (2) Register                                #\n#    (3) Log in                                  #\n#    (Enter) Quit                                #\n#                                                #\n##################################################\n\n"
 	read option
-	while [ ! -z "$option" ]; do
+	while [ -n "$option" ]; do
 		case "$option" in
 			1)
-				play
+				search_songs
 				message_nologin
 				;;
 			2)
 				register
-				main_login
+				if [ "$?" -eq 0 ]; then
+					main_login
+				fi
 				message_nologin
 				;;
 			3)
@@ -168,6 +335,10 @@ function main_nologin() {
 				if [ "$?" -eq 0 ]; then
 					main_login
 				fi
+				message_nologin
+				;;
+			4)
+				download_songs
 				message_nologin
 				;;
 			*)
