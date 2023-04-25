@@ -34,9 +34,9 @@ function search_songs() {
 	read -p "What song(s) would you like to find? " title artist
 	while [ -n "$title" ]; do
 		if [ -n "$artist" ]; then
-			result="$(grep -iE "^.*$title.* by .*$author.*" catalog.txt)"
+			result="$(ggrep -iE "^.*$title.* by .*$author.*" catalog.txt)"
 		else
-			result="$(grep -iE "^.* \(.*$title.*\)$" catalog.txt)"
+			result="$(ggrep -iE "^.* \(.*$title.*\)$" catalog.txt)"
 		fi
 		if [ -z "$result" ]; then
 			printf "No results found for $title."
@@ -82,13 +82,13 @@ function register() {
 	printf "*** Register an Account ***\n"
 	printf "Please enter a unique username and a password containing at least 8 characters, including an uppercase letter, a lowercase letter, and a number. Both the username and password may only contain alphanumeric characters.\n"
 	read -p "Enter username: " username
-	if [[ ! "$username" =~ ^[A-Za-z0-9]+$ ]] || [ -n "$(cut -d, -f2 < users.txt | grep -iE "$username")" ]; then
+	if [[ ! "$username" =~ ^[A-Za-z0-9]+$ ]] || [ -n "$(cut -d, -f2 < users.txt | ggrep -iE "$username")" ]; then
 		printf "\nUsername is invalid or already taken. Press [Enter] to continue.\n"
 		read
 		return 1
 	else
 		read -sp "Enter password: " password
-		if [[ ! "$password" =~ ^[A-Za-z0-9]+$ ]] || [ -z "$(echo "$password" | grep -E ".{8,}" | grep -E "[A-Z]+" | grep -E "[a-z]+" | grep -E "[0-9]+")" ]; then
+		if [[ ! "$password" =~ ^[A-Za-z0-9]+$ ]] || [ -z "$(echo "$password" | ggrep -E ".{8,}" | ggrep -E "[A-Z]+" | ggrep -E "[a-z]+" | ggrep -E "[0-9]+")" ]; then
 			printf "\nPassword is invalid. Press [Enter] to continue.\n"
 			read
 			return 1
@@ -106,7 +106,7 @@ function login() {
 	printf "*** Log in to Your Account ***\n"
 	read -p "Enter username: " username
 	read -sp "Enter password: " password
-	lookup="$(grep -iE "^$username,$password$" users.txt)"
+	lookup="$(ggrep -iE "^$username,$password$" users.txt)"
 	if [ -z "$lookup" ]; then
 		echo
 		read -p "Failed to log in. Invalid username or password. Press [Enter] to continue."
@@ -132,21 +132,21 @@ function search_playlists() {
 	while [ -n "$name" ]; do
 		if [[ "$name" =~ (play [0-9]+) ]]; then
 			id="$(sed -r 's/^play ([0-9]+)/\1/' <<< "$name")"
-			songs="$(grep -E "^$id,.*$" <<< "$playlists" | sed -r 's/^.*,\(([0-9]*(,?[0-9]+)*),\)$/\1/' | sed -r 's/,/\|/g')"
+			songs="$(ggrep -E "^$id,.*$" <<< "$playlists" | sed -r 's/^.*,\(([0-9]*(,?[0-9]+)*),\)$/\1/' | sed -r 's/,/\|/g')"
 			if [ -z "$songs" ]; then
 				printf "\nNo results found for $id, or playlist is empty.."
 			else
 				printf "\nPlaylist $id found. Songs:\n"
 				songs2="$(sed -r 's/\|/\n/g' <<< "$songs")"
-				grep -E "^.* \($songs\)$" catalog.txt
+				ggrep -E "^.* \($songs\)$" catalog.txt
 				echo
 				play_songs "$songs2"
 			fi
 		else
 			if [ -n "$creator" ]; then
-				result="$(grep -E "^[0-9]+*,$name,$creator,.*$" <<< "$playlists")"
+				result="$(ggrep -E "^[0-9]+*,$name,$creator,.*$" <<< "$playlists")"
 			else
-				result="$(grep -E "^[0-9]*$name[0-9]*,.*$" <<< "$playlists")"
+				result="$(ggrep -E "^[0-9]*$name[0-9]*,.*$" <<< "$playlists")"
 			fi
 			if [ -z "$result" ]; then
 				printf "No results found for $name."
@@ -164,7 +164,7 @@ function edit_playlists() {
 	clear
 	printf "*** Edit Playlists ***\n"
 	printf "Your playlists:\n"
-	my_playlists="$(grep -E "^[0-9]+*,[^,]*,$user,.*$" <<< "$playlists")"
+	my_playlists="$(ggrep -E "^[0-9]+*,[^,]*,$user,.*$" <<< "$playlists")"
 	sed -r 's/^([0-9]+),([^,]*),([^,]*),([^,]*),.*$/\[ID: \1\] "\2" by \3 \(\4\)/g' <<< "$my_playlists"
 	echo
 	printf "To view a playlist, use \"view [playlist ID]\".\n"
@@ -178,22 +178,22 @@ function edit_playlists() {
 	while [ -n "$option" ]; do
 		if [[ "$option" =~ (^view [0-9]+$) ]]; then
 			id_pl="$(sed -r 's/^view ([0-9]+)$/\1/' <<< "$option")"
-			if [ -z "$(grep -E "^$id_pl,.*,\([0-9]+,.*\)$" <<< "$my_playlists")" ]; then
+			if [ -z "$(ggrep -E "^$id_pl,.*,\([0-9]+,.*\)$" <<< "$my_playlists")" ]; then
 				printf "Error: Playlist $id_pl does not exist, is empty, or is not owned by you.\n"
 			else
 				printf "Playlist $id_pl contains the following songs:\n"
-				songs="$(grep -E "^$id_pl,.*$" <<< "$my_playlists" | sed -r 's/^.*,\(([0-9]*(,?[0-9]+)*),\)$/\1/' | sed -r 's/,/\|/g')"
+				songs="$(ggrep -E "^$id_pl,.*$" <<< "$my_playlists" | sed -r 's/^.*,\(([0-9]*(,?[0-9]+)*),\)$/\1/' | sed -r 's/,/\|/g')"
 				songs2="$(sed -r 's/\|/\n/g' <<< "$songs")"
-				grep -E "^.* \($songs\)$" catalog.txt
+				ggrep -E "^.* \($songs\)$" catalog.txt
 			fi
 		elif [[ "$option" =~ (^add [0-9]+ [0-9]+$) ]]; then
 			id_song="$(sed -r 's/^add ([0-9]+) [0-9]+$/\1/' <<< "$option")"
 			id_pl="$(sed -r 's/^add [0-9]+ ([0-9]+)$/\1/' <<< "$option")"
-			if [ -z "$(grep -E "^$id_pl,.*$" <<< "$my_playlists")" ]; then
+			if [ -z "$(ggrep -E "^$id_pl,.*$" <<< "$my_playlists")" ]; then
 				printf "Error: Playlist $id_pl does not exist or is not owned by you.\n"
-			elif [ -z "$(grep -E "^.* \($id_song\)$" catalog.txt)" ]; then
+			elif [ -z "$(ggrep -E "^.* \($id_song\)$" catalog.txt)" ]; then
 				printf "Error: Song $id_song does not exist.\n"
-			elif [ ! -z "$(grep -E "^$id_pl,.*,[^0-9]*$id_song,(.*)$" <<< "$my_playlists")" ]; then
+			elif [ ! -z "$(ggrep -E "^$id_pl,.*,[^0-9]*$id_song,(.*)$" <<< "$my_playlists")" ]; then
 				printf "Error: Song $id_song already exists in playlist $id_pl.\n"
 			else
 				sed -r "s/^$id_pl,(.*),\((.*)\)$/$id_pl,\1,\(\2$id_song,\)/" -i playlists.txt
@@ -202,11 +202,11 @@ function edit_playlists() {
 		elif [[ "$option" =~ (^rm [0-9]+ [0-9]+$) ]]; then
 			id_song="$(sed -r 's/^rm ([0-9]+) [0-9]+$/\1/' <<< "$option")"
 			id_pl="$(sed -r 's/^rm [0-9]+ ([0-9]+)$/\1/' <<< "$option")"
-			if [ -z "$(grep -E "^$id_pl,.*$" <<< "$my_playlists")" ]; then
+			if [ -z "$(ggrep -E "^$id_pl,.*$" <<< "$my_playlists")" ]; then
 				printf "Error: Playlist $id_pl does not exist or is not owned by you.\n"
-			elif [ -z "$(grep -E "^.* \($id_song\)$" catalog.txt)" ]; then
+			elif [ -z "$(ggrep -E "^.* \($id_song\)$" catalog.txt)" ]; then
 				printf "Error: Song $id_song does not exist.\n"
-			elif [ ! -z "$(grep -E "^$id_pl,.*,[^0-9]*$id_song,(.*)$" <<< "$playlists")" ]; then
+			elif [ ! -z "$(ggrep -E "^$id_pl,.*,[^0-9]*$id_song,(.*)$" <<< "$playlists")" ]; then
 				sed -r "s/^$id_pl,(.*),\((.*,?)$id_song,(.*)\)$/$id_pl,\1,\(\2\3\)/" -i playlists.txt
 				printf "Song $id_song successfully removed from playlist $id_pl.\n"
 			else
@@ -230,7 +230,7 @@ function edit_playlists() {
 			fi
 		elif [[ "$option" =~ (^del [0-9]+$) ]]; then
 			id_pl="$(sed -r 's/^del ([0-9]+)$/\1/' <<< "$option")"
-			if [ -z "$(grep -E "^$id_pl,.*$" <<< "$my_playlists")" ]; then
+			if [ -z "$(ggrep -E "^$id_pl,.*$" <<< "$my_playlists")" ]; then
 				printf "Error: Playlist $id_pl does not exist or is not owned by you.\n"
 			else
 				read -p "Are you sure you want to delete playlist $id_pl [y/n]? " ans
@@ -246,8 +246,8 @@ function edit_playlists() {
 		fi
 		echo
 		read -p "Please enter another command, or press [Enter] to return to the main menu: " option
-		playlists="$(grep -E "^.*,.*,$user,.*$|^.*,.*,.*,public,.*$" playlists.txt | sed -r 's/ /\n/g')"
-		my_playlists="$(grep -E "^[0-9]+*,[^,]*,$user,.*$" <<< "$playlists")"
+		playlists="$(ggrep -E "^.*,.*,$user,.*$|^.*,.*,.*,public,.*$" playlists.txt | sed -r 's/ /\n/g')"
+		my_playlists="$(ggrep -E "^[0-9]+*,[^,]*,$user,.*$" <<< "$playlists")"
 	done
 }
 
@@ -267,7 +267,7 @@ function message_login() {
 }
 
 function main_login() {
-	playlists="$(grep -E "^.*,.*,$user,.*$|^.*,.*,.*,public,.*$" playlists.txt | sed -r 's/ /\n/g')"
+	playlists="$(ggrep -E "^.*,.*,$user,.*$|^.*,.*,.*,public,.*$" playlists.txt | sed -r 's/ /\n/g')"
 	message_login
 	read option
         while [ -n "$option" ]; do
