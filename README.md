@@ -1,12 +1,18 @@
 # tunix: A Unix-Based Music Player
 *by Kevin Liu*
 
-tunix is an mpv-based, command-line music player that allows users to download songs from online, play them, and form playlists from them.
+tunix is an `mpv`-based, command-line music player that allows users to download songs from online, play them, and form playlists from them.
 
-## Usage
+## General
+
 tunix allows users to create accounts for handling music. A user does not need to be logged in order to download, search for, or play songs. To play a song, the user can search for the song via either title/author or song ID. To download a song, the user must provide an appropriate title, author, and MP3 URL.
 
 Once a user is logged in, they have the ability to create and delete playlists, as well as add or remove existing songs to/from these playlists. Each playlist may be set as public or private - public playlists can be viewed and played by any logged-in user, whereas private playlists can only be viewed and played by the creator themself. Thus, a user can only access playlists created by themself or public playlists, and these can be found by searching.
+
+## Usage
+To use tunix, run `tunix.sh` (for GNU users) or `tunix_mac.sh` (for MacOS users). Then, follow the instructions given by the program.
+
+Note: tunix uses the `mpv` program to play audio. For more info on how to use `mpv`, see https://mpv.io/manual/master/.
 
 ## Contents
 tunix is written entirely in Bash. We provide two different scripts: `tunix.sh` for GNU users, and `tunix_mac.sh` for MacOS users.
