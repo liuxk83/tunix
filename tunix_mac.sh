@@ -43,7 +43,7 @@ function search_songs() {
 		else
 			printf "$result"
 			printf "\n\n"
-			ids="$(sed -r 's/^.* \(([0-9]+)\)/\1/g' <<< $result)"
+			ids="$(gsed -r 's/^.* \(([0-9]+)\)/\1/g' <<< $result)"
 			play_songs "$ids"
 		fi
 		echo
@@ -67,7 +67,7 @@ function download_songs() {
 	else
 		read -p "Please enter the URL of the song file: " url
 		printf "\nDownloading..."
-		let id_new="1 + $(sed -r 's/^.*\(([0-9]+)\)$/\1/g' catalog.txt | sort -n | tail -1)"
+		let id_new="1 + $(gsed -r 's/^.*\(([0-9]+)\)$/\1/g' catalog.txt | sort -n | tail -1)"
 		cd songs
 		wget -O "$id_new.mp3" "$url"
 		cd ..
@@ -131,13 +131,13 @@ function search_playlists() {
 	read -p "What playlist(s) would you like to find? " name creator
 	while [ -n "$name" ]; do
 		if [[ "$name" =~ (play [0-9]+) ]]; then
-			id="$(sed -r 's/^play ([0-9]+)/\1/' <<< "$name")"
-			songs="$(ggrep -E "^$id,.*$" <<< "$playlists" | sed -r 's/^.*,\(([0-9]*(,?[0-9]+)*),\)$/\1/' | sed -r 's/,/\|/g')"
+			id="$(gsed -r 's/^play ([0-9]+)/\1/' <<< "$name")"
+			songs="$(ggrep -E "^$id,.*$" <<< "$playlists" | gsed -r 's/^.*,\(([0-9]*(,?[0-9]+)*),\)$/\1/' | sed -r 's/,/\|/g')"
 			if [ -z "$songs" ]; then
 				printf "\nNo results found for $id, or playlist is empty.."
 			else
 				printf "\nPlaylist $id found. Songs:\n"
-				songs2="$(sed -r 's/\|/\n/g' <<< "$songs")"
+				songs2="$(gsed -r 's/\|/\n/g' <<< "$songs")"
 				ggrep -E "^.* \($songs\)$" catalog.txt
 				echo
 				play_songs "$songs2"
@@ -151,7 +151,7 @@ function search_playlists() {
 			if [ -z "$result" ]; then
 				printf "No results found for $name."
 			else
-				sed -r 's/^([0-9]+),([^,]*),([^,]*),([^,]*),.*$/\[ID: \1\] "\2" by \3 \(\4\)/g' <<< "$result"
+				gsed -r 's/^([0-9]+),([^,]*),([^,]*),([^,]*),.*$/\[ID: \1\] "\2" by \3 \(\4\)/g' <<< "$result"
 			fi
 		fi
 		printf "\n"
@@ -165,7 +165,7 @@ function edit_playlists() {
 	printf "*** Edit Playlists ***\n"
 	printf "Your playlists:\n"
 	my_playlists="$(ggrep -E "^[0-9]+*,[^,]*,$user,.*$" <<< "$playlists")"
-	sed -r 's/^([0-9]+),([^,]*),([^,]*),([^,]*),.*$/\[ID: \1\] "\2" by \3 \(\4\)/g' <<< "$my_playlists"
+	gsed -r 's/^([0-9]+),([^,]*),([^,]*),([^,]*),.*$/\[ID: \1\] "\2" by \3 \(\4\)/g' <<< "$my_playlists"
 	echo
 	printf "To view a playlist, use \"view [playlist ID]\".\n"
 	printf "To add a song to a playlist, use \"add [song ID] [playlist ID]\".\n"
@@ -177,18 +177,18 @@ function edit_playlists() {
 	read option
 	while [ -n "$option" ]; do
 		if [[ "$option" =~ (^view [0-9]+$) ]]; then
-			id_pl="$(sed -r 's/^view ([0-9]+)$/\1/' <<< "$option")"
+			id_pl="$(gsed -r 's/^view ([0-9]+)$/\1/' <<< "$option")"
 			if [ -z "$(ggrep -E "^$id_pl,.*,\([0-9]+,.*\)$" <<< "$my_playlists")" ]; then
 				printf "Error: Playlist $id_pl does not exist, is empty, or is not owned by you.\n"
 			else
 				printf "Playlist $id_pl contains the following songs:\n"
-				songs="$(ggrep -E "^$id_pl,.*$" <<< "$my_playlists" | sed -r 's/^.*,\(([0-9]*(,?[0-9]+)*),\)$/\1/' | sed -r 's/,/\|/g')"
-				songs2="$(sed -r 's/\|/\n/g' <<< "$songs")"
+				songs="$(ggrep -E "^$id_pl,.*$" <<< "$my_playlists" | gsed -r 's/^.*,\(([0-9]*(,?[0-9]+)*),\)$/\1/' | gsed -r 's/,/\|/g')"
+				songs2="$(gsed -r 's/\|/\n/g' <<< "$songs")"
 				ggrep -E "^.* \($songs\)$" catalog.txt
 			fi
 		elif [[ "$option" =~ (^add [0-9]+ [0-9]+$) ]]; then
-			id_song="$(sed -r 's/^add ([0-9]+) [0-9]+$/\1/' <<< "$option")"
-			id_pl="$(sed -r 's/^add [0-9]+ ([0-9]+)$/\1/' <<< "$option")"
+			id_song="$(gsed -r 's/^add ([0-9]+) [0-9]+$/\1/' <<< "$option")"
+			id_pl="$(gsed -r 's/^add [0-9]+ ([0-9]+)$/\1/' <<< "$option")"
 			if [ -z "$(ggrep -E "^$id_pl,.*$" <<< "$my_playlists")" ]; then
 				printf "Error: Playlist $id_pl does not exist or is not owned by you.\n"
 			elif [ -z "$(ggrep -E "^.* \($id_song\)$" catalog.txt)" ]; then
@@ -196,18 +196,18 @@ function edit_playlists() {
 			elif [ ! -z "$(ggrep -E "^$id_pl,.*,[^0-9]*$id_song,(.*)$" <<< "$my_playlists")" ]; then
 				printf "Error: Song $id_song already exists in playlist $id_pl.\n"
 			else
-				sed -r "s/^$id_pl,(.*),\((.*)\)$/$id_pl,\1,\(\2$id_song,\)/" -i playlists.txt
+				gsed -r "s/^$id_pl,(.*),\((.*)\)$/$id_pl,\1,\(\2$id_song,\)/" -i playlists.txt
 				printf "Song $id_song successfully added to playlist $id_pl.\n"
 			fi
 		elif [[ "$option" =~ (^rm [0-9]+ [0-9]+$) ]]; then
-			id_song="$(sed -r 's/^rm ([0-9]+) [0-9]+$/\1/' <<< "$option")"
-			id_pl="$(sed -r 's/^rm [0-9]+ ([0-9]+)$/\1/' <<< "$option")"
+			id_song="$(gsed -r 's/^rm ([0-9]+) [0-9]+$/\1/' <<< "$option")"
+			id_pl="$(gsed -r 's/^rm [0-9]+ ([0-9]+)$/\1/' <<< "$option")"
 			if [ -z "$(ggrep -E "^$id_pl,.*$" <<< "$my_playlists")" ]; then
 				printf "Error: Playlist $id_pl does not exist or is not owned by you.\n"
 			elif [ -z "$(ggrep -E "^.* \($id_song\)$" catalog.txt)" ]; then
 				printf "Error: Song $id_song does not exist.\n"
 			elif [ ! -z "$(ggrep -E "^$id_pl,.*,[^0-9]*$id_song,(.*)$" <<< "$playlists")" ]; then
-				sed -r "s/^$id_pl,(.*),\((.*,?)$id_song,(.*)\)$/$id_pl,\1,\(\2\3\)/" -i playlists.txt
+				gsed -r "s/^$id_pl,(.*),\((.*,?)$id_song,(.*)\)$/$id_pl,\1,\(\2\3\)/" -i playlists.txt
 				printf "Song $id_song successfully removed from playlist $id_pl.\n"
 			else
 				printf "Error: Song $id_song does not exist in playlist $id_pl.\n"
@@ -229,13 +229,13 @@ function edit_playlists() {
 				fi
 			fi
 		elif [[ "$option" =~ (^del [0-9]+$) ]]; then
-			id_pl="$(sed -r 's/^del ([0-9]+)$/\1/' <<< "$option")"
+			id_pl="$(gsed -r 's/^del ([0-9]+)$/\1/' <<< "$option")"
 			if [ -z "$(ggrep -E "^$id_pl,.*$" <<< "$my_playlists")" ]; then
 				printf "Error: Playlist $id_pl does not exist or is not owned by you.\n"
 			else
 				read -p "Are you sure you want to delete playlist $id_pl [y/n]? " ans
 				if [ "$ans" == "y" ]; then
-					sed -r "s/^$id_pl,.*$//" -i playlists.txt
+					gsed -r "s/^$id_pl,.*$//" -i playlists.txt
 					printf "Playlist $id_pl by $user has been successfully deleted.\n"
 				else
 					printf "No action taken.\n"
@@ -246,7 +246,7 @@ function edit_playlists() {
 		fi
 		echo
 		read -p "Please enter another command, or press [Enter] to return to the main menu: " option
-		playlists="$(ggrep -E "^.*,.*,$user,.*$|^.*,.*,.*,public,.*$" playlists.txt | sed -r 's/ /\n/g')"
+		playlists="$(ggrep -E "^.*,.*,$user,.*$|^.*,.*,.*,public,.*$" playlists.txt | gsed -r 's/ /\n/g')"
 		my_playlists="$(ggrep -E "^[0-9]+*,[^,]*,$user,.*$" <<< "$playlists")"
 	done
 }
@@ -267,7 +267,7 @@ function message_login() {
 }
 
 function main_login() {
-	playlists="$(ggrep -E "^.*,.*,$user,.*$|^.*,.*,.*,public,.*$" playlists.txt | sed -r 's/ /\n/g')"
+	playlists="$(ggrep -E "^.*,.*,$user,.*$|^.*,.*,.*,public,.*$" playlists.txt | gsed -r 's/ /\n/g')"
 	message_login
 	read option
         while [ -n "$option" ]; do
